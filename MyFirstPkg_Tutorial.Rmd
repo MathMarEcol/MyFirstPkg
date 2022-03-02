@@ -173,6 +173,12 @@ Get_PlanningUnits <- function(Region, CellArea){
 }
 ```
 
+```{r, eval = FALSE}
+CellArea <- 100000
+Region = "South Atlantic Ocean"
+PUs <- Get_PlanningUnits(Region, CellArea)
+```
+
 Now we have our first function for the package. What do we do with it?
 
 ## `use_r()`
@@ -201,7 +207,7 @@ If you recall, we said we would deal with `magrittr` later. We will need to firs
 
 ```{r, eval = FALSE}
 # Importing pipe from magrittr
-use_pipe() 
+usethis::use_pipe()
 
 # The document functions updates NAMESPACE so we can use the pipe in our first function
 devtools::document()
@@ -244,7 +250,7 @@ Now call `Get_PlanningUnits()` to see how it works.
 ```{r, eval = FALSE}
 CellArea <- 100000
 Region = "South Atlantic Ocean"
-Get_PlanningUnits(Region, CellArea)
+PUs <- Get_PlanningUnits(Region, CellArea)
 ```
 
 Note that `load_all()` has made the `Get_PlanningUnits()` function available, although it does not exist in the global environment.
@@ -282,27 +288,6 @@ Deal with problems early and often.
 It's just like incremental development of `.R` and `.Rmd` files.
 The longer you go between full checks that everything works, the harder it becomes to pinpoint and solve your problems.
 
-```
-Non-standard license specification:
-  `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-  license
-```
-
-We'll address that soon, by doing exactly what it says.
-
-## Edit `DESCRIPTION`
-
-The `DESCRIPTION` file provides metadata about your package and is covered fully in chapter \@ref(description).
-This is a good time to have a look at regexcite's current `DESCRIPTION`.
-You'll see it's populated with boilerplate content, which needs to be replaced.
-
-Make these edits:
-
-* Make yourself the author. If you don't have an ORCID, you can omit the
-  `comment = ...` portion.
-* Write some descriptive text in the `Title` and `Description` fields.
-  
-
 ## `use_mit_license()`
 
 > [Pick a License, Any License. -- Jeff Atwood](https://blog.codinghorror.com/pick-a-license-any-license/)
@@ -318,6 +303,18 @@ This configures the `License` field correctly for the MIT license, which promise
 Like other license helpers, `use_mit_license()` also puts a copy of the full license in `LICENSE.md` and adds this file to `.Rbuildignore`.
 It's considered a best practice to include a full license in your package's source, such as on GitHub.
 
+## Edit `DESCRIPTION`
+
+The `DESCRIPTION` file provides metadata about your package and is covered fully in chapter \@ref(description).
+This is a good time to have a look at regexcite's current `DESCRIPTION`.
+You'll see it's populated with boilerplate content, which needs to be replaced.
+
+Make these edits:
+
+* Make yourself the author. If you don't have an ORCID, you can omit the
+  `comment = ...` portion.
+* Write some descriptive text in the `Title` and `Description` fields.
+  
 
 ## `document()`
 
@@ -373,11 +370,12 @@ library(splanning)
 
 CellArea <- 100000
 Region = "South Atlantic Ocean"
-Get_PlanningUnits(Region, CellArea)
+PUs <- Get_PlanningUnits(Region, CellArea)
 
 library(ggplot2)
+library(rnaturalearth)
 world <- ne_countries(scale = "medium", type = "countries", returnclass = "sf") %>% 
-  filter(continent == "South America" | continent == "Africa")
+  dplyr::filter(continent == "South America" | continent == "Africa")
 
 ggplot() + 
   geom_sf(data = world, aes(fill = name), show.legend = FALSE) + 

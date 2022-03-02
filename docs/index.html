@@ -1900,6 +1900,9 @@ library(magrittr)</code></pre>
                     sf::st_intersects(Bndry) %&gt;%
                     lengths &gt; 0) # Get logical vector instead of sparse geometry binary
 }</code></pre>
+<pre class="r"><code>CellArea &lt;- 100000
+Region = &quot;South Atlantic Ocean&quot;
+PUs &lt;- Get_PlanningUnits(Region, CellArea)</code></pre>
 <p>Now we have our first function for the package. What do we do with
 it?</p>
 </div>
@@ -1938,7 +1941,7 @@ later. We will need to first import the pipe from magrittr so we can use
 it in our package. Again, <code>usethis</code> comes to the rescue with
 an easy to use function.</p>
 <pre class="r"><code># Importing pipe from magrittr
-use_pipe() 
+usethis::use_pipe()
 
 # The document functions updates NAMESPACE so we can use the pipe in our first function
 devtools::document()
@@ -1979,7 +1982,7 @@ available for experimentation.</p>
 <p>Now call <code>Get_PlanningUnits()</code> to see how it works.</p>
 <pre class="r"><code>CellArea &lt;- 100000
 Region = &quot;South Atlantic Ocean&quot;
-Get_PlanningUnits(Region, CellArea)</code></pre>
+PUs &lt;- Get_PlanningUnits(Region, CellArea)</code></pre>
 <p>Note that <code>load_all()</code> has made the
 <code>Get_PlanningUnits()</code> function available, although it does
 not exist in the global environment.</p>
@@ -2020,25 +2023,6 @@ early and often. It’s just like incremental development of
 <code>.R</code> and <code>.Rmd</code> files. The longer you go between
 full checks that everything works, the harder it becomes to pinpoint and
 solve your problems.</p>
-<pre><code>Non-standard license specification:
-  `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-  license</code></pre>
-<p>We’ll address that soon, by doing exactly what it says.</p>
-</div>
-<div id="edit-description" class="section level2">
-<h2>Edit <code>DESCRIPTION</code></h2>
-<p>The <code>DESCRIPTION</code> file provides metadata about your
-package and is covered fully in chapter @ref(description). This is a
-good time to have a look at regexcite’s current
-<code>DESCRIPTION</code>. You’ll see it’s populated with boilerplate
-content, which needs to be replaced.</p>
-<p>Make these edits:</p>
-<ul>
-<li>Make yourself the author. If you don’t have an ORCID, you can omit
-the <code>comment = ...</code> portion.</li>
-<li>Write some descriptive text in the <code>Title</code> and
-<code>Description</code> fields.</li>
-</ul>
 </div>
 <div id="use_mit_license" class="section level2">
 <h2><code>use_mit_license()</code></h2>
@@ -2055,6 +2039,21 @@ license, which promises to name the copyright holders and year in a
 a copy of the full license in <code>LICENSE.md</code> and adds this file
 to <code>.Rbuildignore</code>. It’s considered a best practice to
 include a full license in your package’s source, such as on GitHub.</p>
+</div>
+<div id="edit-description" class="section level2">
+<h2>Edit <code>DESCRIPTION</code></h2>
+<p>The <code>DESCRIPTION</code> file provides metadata about your
+package and is covered fully in chapter @ref(description). This is a
+good time to have a look at regexcite’s current
+<code>DESCRIPTION</code>. You’ll see it’s populated with boilerplate
+content, which needs to be replaced.</p>
+<p>Make these edits:</p>
+<ul>
+<li>Make yourself the author. If you don’t have an ORCID, you can omit
+the <code>comment = ...</code> portion.</li>
+<li>Write some descriptive text in the <code>Title</code> and
+<code>Description</code> fields.</li>
+</ul>
 </div>
 <div id="document" class="section level2">
 <h2><code>document()</code></h2>
@@ -2101,11 +2100,12 @@ restart your R session and ensure you have a clean workspace.</p>
 
 CellArea &lt;- 100000
 Region = &quot;South Atlantic Ocean&quot;
-Get_PlanningUnits(Region, CellArea)
+PUs &lt;- Get_PlanningUnits(Region, CellArea)
 
 library(ggplot2)
+library(rnaturalearth)
 world &lt;- ne_countries(scale = &quot;medium&quot;, type = &quot;countries&quot;, returnclass = &quot;sf&quot;) %&gt;% 
-  filter(continent == &quot;South America&quot; | continent == &quot;Africa&quot;)
+  dplyr::filter(continent == &quot;South America&quot; | continent == &quot;Africa&quot;)
 
 ggplot() + 
   geom_sf(data = world, aes(fill = name), show.legend = FALSE) + 
