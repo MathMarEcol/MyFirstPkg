@@ -2103,8 +2103,8 @@ Region = &quot;South Atlantic Ocean&quot;
 PUs &lt;- Get_PlanningUnits(Region, CellArea)
 
 library(ggplot2)
-library(rnaturalearth)
-world &lt;- ne_countries(scale = &quot;medium&quot;, type = &quot;countries&quot;, returnclass = &quot;sf&quot;) %&gt;% 
+
+world &lt;- rnaturalearth::ne_countries(scale = &quot;medium&quot;, type = &quot;countries&quot;, returnclass = &quot;sf&quot;) %&gt;% 
   dplyr::filter(continent == &quot;South America&quot; | continent == &quot;Africa&quot;)
 
 ggplot() + 
@@ -2121,7 +2121,7 @@ chapter @ref(vignettes)), or submit it to CRAN (see chapter
 @ref(release)).</p>
 <p>The <code>use_readme_rmd()</code> function initializes a basic,
 executable <code>README.Rmd</code> ready for you to edit:</p>
-<pre class="r"><code>use_readme_rmd()</code></pre>
+<pre class="r"><code>usethis::use_readme_rmd()</code></pre>
 <p>In addition to creating <code>README.Rmd</code>, this adds some lines
 to <code>.Rbuildignore</code>, and creates a Git pre-commit hook to help
 you keep <code>README.Rmd</code> and <code>README.md</code> in sync.</p>
@@ -2166,7 +2166,7 @@ usethis::use_data(Bndry)</code></pre>
 <h2><code>use_badges</code></h2>
 <p>There are many badges you can use in your markdown and website which
 indicates the status of your project.</p>
-<pre class="r"><code>use_lifecycle_badge(&quot;experimental&quot;)</code></pre>
+<pre class="r"><code>usethis::use_lifecycle_badge(&quot;experimental&quot;)</code></pre>
 <p>Functions that configure continuous integration, such as
 <code>use_github_actions()</code>, also create badges.</p>
 </div>

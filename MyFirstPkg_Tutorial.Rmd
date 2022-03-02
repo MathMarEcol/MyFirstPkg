@@ -373,8 +373,8 @@ Region = "South Atlantic Ocean"
 PUs <- Get_PlanningUnits(Region, CellArea)
 
 library(ggplot2)
-library(rnaturalearth)
-world <- ne_countries(scale = "medium", type = "countries", returnclass = "sf") %>% 
+
+world <- rnaturalearth::ne_countries(scale = "medium", type = "countries", returnclass = "sf") %>% 
   dplyr::filter(continent == "South America" | continent == "Africa")
 
 ggplot() + 
@@ -393,7 +393,7 @@ It is the package's home page and welcome mat, at least until you decide to give
 The `use_readme_rmd()` function initializes a basic, executable `README.Rmd` ready for you to edit:
 
 ```{r use-readme-rmd, eval = FALSE}
-use_readme_rmd()
+usethis::use_readme_rmd()
 ```
 
 In addition to creating `README.Rmd`, this adds some lines to `.Rbuildignore`, and creates a Git pre-commit hook to help you keep `README.Rmd` and `README.md` in sync.
@@ -441,7 +441,7 @@ usethis::use_data(Bndry)
 There are many badges you can use in your markdown and website which indicates the status of your project.
 
 ```{r, eval = FALSE}
-use_lifecycle_badge("experimental")
+usethis::use_lifecycle_badge("experimental")
 ```
 
 Functions that configure continuous integration, such as `use_github_actions()`, also create badges.
