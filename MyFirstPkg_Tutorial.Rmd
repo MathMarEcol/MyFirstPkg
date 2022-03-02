@@ -1,0 +1,506 @@
+---
+title: "An Introduction to Building R Packages"
+author: "Jason D Everett"
+date: "`r Sys.Date()`"
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: show
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      error = FALSE, 
+                      eval = FALSE)
+```
+
+```{r klippy, eval=TRUE, echo=FALSE, include=TRUE}
+klippy::klippy(position = c('top', 'right'))
+```
+
+## `create_package()`
+
+Call `create_package()` to initialize a new package in a directory on your computer (and create the directory, if necessary).
+
+Make a deliberate choice about where to create this package on your computer.
+It should probably be somewhere within your home directory, alongside your other R projects.
+It should not be nested inside another RStudio Project, R package, or Git repo.
+Nor should it be in an R package library, which holds packages that have already been built and installed.
+The conversion of the source package we create here into an installed package is part of what devtools facilitates.
+Don't try to do devtools' job for it!
+
+```{r}
+# Create the basic skeleton of your package
+# create_package("package_name")
+
+usethis::create_package("~/GitHub/splanning")
+```
+
+If you're working in RStudio, you should find yourself in a new instance of RStudio, opened into your new planningunits package (and Project).
+RStudio has special handling for packages and you should now see a *Build* tab in the same pane as *Environment* and *History*.
+
+* `.Rbuildignore` lists files that we need to have around but that should not be
+  included when building the R package from source.
+* `.Rproj.user`, if you have it, is a directory used internally by RStudio.
+* `.gitignore` anticipates Git usage and ignores some standard,
+  behind-the-scenes files created by R and RStudio.
+  Even if you do not plan to use Git, this is harmless.
+* `DESCRIPTION` provides [metadata about your package].
+  We edit this shortly.
+* [`NAMESPACE`] declares the functions your package exports for
+  external use and the external functions your package imports from other
+  packages.
+  At this point, it is empty, except for a comment declaring that this is a file
+  we will not edit by hand.
+* The `R/` directory is the ["business end" of your package].
+  It will soon contain `.R` files with function definitions.
+* `planningunits.Rproj` is the file that makes this directory an RStudio Project.
+  Even if you don't use RStudio, this file is harmless.
+  Or you can suppress its creation with `create_package(..., rstudio = FALSE)`.
+
+## `use_git()`
+
+The use of Git or another version control system is optional, but a recommended practice in the long-term.
+
+The planningunits directory is an R source package and an RStudio Project.
+Now we make it also a Git repository, with `use_git()`.
+
+```{r use-git, eval = FALSE}
+usethis::use_git()
+```
+
+What's new?
+Only the creation of a `.git` directory, which is hidden in most contexts, including the RStudio file browser.
+Its existence is evidence that we have indeed initialized a Git repo here.
+
+If you're using RStudio, it probably requested permission to relaunch itself in this Project, which you should do.
+Now, in addition to package development support, you have access to a basic Git client in the *Git* tab of the *Environment/History/Build* pane.
+
+## Write the first function
+
+Before we start building a package, you would normally have a good idea of what you want to include. Or maybe you already have a bunch of functions that you think will be useful to be bundled as a package.
+
+Within the MME lab, we do a lot of spatial planning work with our students. This necessitates the creation of equal area planning units (a grid of hexagons) that we use for solving our planning problems. Each planning unit is allocated to be either within a reserve, or not. Wouldn't it be easier for all our students if we had a function that created the planning units for them?
+
+Lets have a go.
+
+First I have some code as a script. 
+
+```{r, eval=FALSE}
+library(magrittr)
+library(dplyr)
+library(sf)
+library(rnaturalearth)
+
+CellArea <- 100000
+Region = "South Atlantic Ocean"
+
+cCRS <- "+proj=robin +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs" 
+diameter <- 2 * sqrt((CellArea*1e6)/((3*sqrt(3)/2))) * sqrt(3)/2 # Diameter in m's
+
+Bndry <- ne_download(scale = "medium", category = "physical", type = "geography_marine_polys", returnclass = "sf") %>% 
+  filter(name %in% Region) %>%   # Filter out ocean_list from ocean_sf
+  select(name, ne_id, geometry) %>% 
+  st_transform(cCRS)
+
+# First create planning units for the whole region
+PUs <- st_make_grid(Bndry,
+                    square = FALSE,
+                    cellsize = c(diameter, diameter),
+                    what = "polygons") %>%
+  st_sf() %>% 
+  filter(st_centroid(.) %>%
+           st_intersects(Bndry) %>%
+           lengths > 0) # Get logical vector instead of sparse geometry binary
+
+```
+
+Lets check the code works by plotting the output.
+
+```{r, eval = FALSE}
+library(ggplot2)
+
+world <- ne_countries(scale = "medium", type = "countries", returnclass = "sf") %>% 
+  filter(continent == "South America" | continent == "Africa")
+
+ggplot() + 
+  geom_sf(data = world, aes(fill = name), show.legend = FALSE) + 
+  geom_sf(data = PUs)
+```
+
+This code is likely to be reused multiple times so I should turn it into a function. The first thing I need to do is put the function call at the top, and decide on the inputs. Then I will add all the package calls and remove the library calls (except magrittr at the moment). 
+
+Read [R4DS](https://r4ds.had.co.nz) for more information about writing functions. 
+
+```{r, eval=FALSE}
+CellArea <- 100000
+Region = "South Atlantic Ocean"
+
+library(magrittr)
+```
+
+```{r, eval=FALSE}
+Get_PlanningUnits <- function(Region, CellArea){
+
+  cCRS <- "+proj=robin +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs" 
+  diameter <- 2 * sqrt((CellArea*1e6)/((3*sqrt(3)/2))) * sqrt(3)/2 # Diameter in m's
+  
+  Bndry <- rnaturalearth::ne_download(scale = "medium", category = "physical", type = "geography_marine_polys", returnclass = "sf") %>% 
+    dplyr::filter(name %in% Region) %>%   # Filter out ocean_list from ocean_sf
+    dplyr::select(name, ne_id, geometry) %>% 
+    sf::st_transform(cCRS)
+  
+  # First create planning units for the whole region
+  PUs <- sf::st_make_grid(Bndry,
+                          square = FALSE,
+                          cellsize = c(diameter, diameter),
+                          what = "polygons") %>%
+    sf::st_sf() %>% 
+    dplyr::filter(sf::st_centroid(.) %>%
+                    sf::st_intersects(Bndry) %>%
+                    lengths > 0) # Get logical vector instead of sparse geometry binary
+}
+```
+
+Now we have our first function for the package. What do we do with it?
+
+## `use_r()`
+
+Save it in a `.R` file, in the `R/` subdirectory of your package.
+A reasonable starting position is to make a new `.R` file for each user-facing function in your package and name the file after the function.
+As you add more functions, you'll want to relax this and begin to group related functions together.
+We'll save the definition of `Get_PlanningUnits()` in the file `R/Get_PlanningUnits.R`.
+
+The helper `use_r()` creates and/or opens a script below `R/`.
+It really shines in a more mature package, when navigating between `.R` files and the associated test file.
+But, even here, it's useful to keep yourself from getting too carried away while working in `Untitled4`.
+
+```{r init-Get_PlanningUnits, eval = FALSE}
+usethis::use_r("Get_PlanningUnits")
+```
+
+Put the definition of `Get_PlanningUnits()` **and only the definition of `Get_PlanningUnits()`** in `R/Get_PlanningUnits.R` and save it.
+The file `R/Get_PlanningUnits.R` should NOT contain any of the other top-level code we have recently executed, such as the definition of our practice input such as `CellArea <- 1000000`, `Region = "South Atlantic Ocean"`, `library(magrittr)` `devtools::use_r()`, or `devtools::use_git()`.
+This foreshadows an adjustment you'll need to make as you transition from writing R scripts to R packages.
+Packages and scripts use different mechanisms to declare their dependency on other packages and to store example or test code.
+
+## `use_pipe()`
+
+If you recall, we said we would deal with `magrittr` later. We will need to first import the pipe from magrittr so we can use it in our package. Again, `usethis` comes to the rescue with an easy to use function.
+
+```{r, eval = FALSE}
+# Importing pipe from magrittr
+use_pipe() 
+
+# The document functions updates NAMESPACE so we can use the pipe in our first function
+devtools::document()
+# Look at NAMESPACE
+```
+
+## `use_package()`
+
+You will inevitably want to use a function from another package in your own package.
+Just as we needed to **export** `Get_PlanningUnits()`, we need to **import** functions from the namespace of other packages.
+If you plan to submit a package to CRAN, note that this even applies to functions in packages that you think of as "always available", such as `stats::median()` or `utils::head()`.
+
+If we look back at our function, we can see we are using 3 packages
+```{r, eval = FALSE}
+usethis::use_package("dplyr")
+usethis::use_package("rnaturalearth")
+usethis::use_package("sf")
+```
+
+This code adds these 3 packages to the "Imports" section of `DESCRIPTION`.
+And that is all it does.
+
+## `load_all()`
+
+Before we start playing with our package, lets restart R to ensure we have a clean slate. Go to the menu bar and click `Session` -> `Restart R`. It is really good practice to do this regularily when youa re coding!
+
+How do we test drive `Get_PlanningUnits()`?
+If this were a regular R script, we might use RStudio to send the function definition to the R Console and define `Get_PlanningUnits()` in the global environment.
+Or maybe we'd call `source("R/Get_PlanningUnits.R")`.
+For package development, however, devtools offers a more robust approach.
+
+Call `load_all()` to make `Get_PlanningUnits()` available for experimentation.
+
+```{r load-all, eval = FALSE}
+devtools::load_all()
+```
+
+Now call `Get_PlanningUnits()` to see how it works.
+
+```{r, eval = FALSE}
+CellArea <- 100000
+Region = "South Atlantic Ocean"
+Get_PlanningUnits(Region, CellArea)
+```
+
+Note that `load_all()` has made the `Get_PlanningUnits()` function available, although it does not exist in the global environment.
+
+`load_all()` simulates the process of building, installing, and attaching the splanning package.
+As your package accumulates more functions, some exported, some not, some of which call each other, some of which call functions from packages you depend on, `load_all()` gives you a much more accurate sense of how the package is developing than test driving functions defined in the global environment.
+Also `load_all()` allows much faster iteration than actually building, installing, and attaching the package.
+
+Review so far:
+
+* We wrote our first function, `Get_PlanningUnits`.
+* We used `load_all()` to quickly make this function available for interactive
+  use, as if we'd built and installed splanning and attached it via
+  `library(splanning)`.
+
+## `check()`
+
+We have informal, empirical evidence that `Get_PlanningUnits()` works.
+But how can we be sure that all the moving parts of the regexcite package still work?
+This may seem silly to check, after such a small addition, but it's good to establish the habit of checking this often.
+
+`R CMD check`, executed in the shell, is the gold standard for checking that an R package is in full working order.
+`check()` is a convenient way to run this without leaving your R session.
+
+Note that `check()` produces rather voluminous output, optimized for interactive consumption.
+We intercept that here and just reveal a summary.
+Your local `check()` output will be different.
+
+```{r first-check-fake, eval = FALSE}
+devtools::check()
+```
+
+**Read the output of the check!**
+Deal with problems early and often.
+It's just like incremental development of `.R` and `.Rmd` files.
+The longer you go between full checks that everything works, the harder it becomes to pinpoint and solve your problems.
+
+```
+Non-standard license specification:
+  `use_mit_license()`, `use_gpl3_license()` or friends to pick a
+  license
+```
+
+We'll address that soon, by doing exactly what it says.
+
+## Edit `DESCRIPTION`
+
+The `DESCRIPTION` file provides metadata about your package and is covered fully in chapter \@ref(description).
+This is a good time to have a look at regexcite's current `DESCRIPTION`.
+You'll see it's populated with boilerplate content, which needs to be replaced.
+
+Make these edits:
+
+* Make yourself the author. If you don't have an ORCID, you can omit the
+  `comment = ...` portion.
+* Write some descriptive text in the `Title` and `Description` fields.
+  
+
+## `use_mit_license()`
+
+> [Pick a License, Any License. -- Jeff Atwood](https://blog.codinghorror.com/pick-a-license-any-license/)
+
+Let's call `use_mit_license()`.
+
+```{r use-mit-license, eval = FALSE}
+usethis::use_mit_license()
+```
+
+This configures the `License` field correctly for the MIT license, which promises to name the copyright holders and year in a `LICENSE` file.
+
+Like other license helpers, `use_mit_license()` also puts a copy of the full license in `LICENSE.md` and adds this file to `.Rbuildignore`.
+It's considered a best practice to include a full license in your package's source, such as on GitHub.
+
+
+## `document()`
+
+Wouldn't it be nice to get help on `Get_PlanningUnits()`, just like we do with other R functions?
+This requires that your package have a special R documentation file, `man/Get_PlanningUnits.Rd`, written in an R-specific markup language that is sort of like LaTeX.
+Luckily we don't necessarily have to author that directly.
+
+We write a specially formatted comment right above `Get_PlanningUnits()`, in its source file, and then let a package called [roxygen2](https://roxygen2.r-lib.org) handle the creation of `man/Get_PlanningUnits.Rd`.
+The motivation and mechanics of roxygen2 are covered in chapter \@ref(man).
+
+If you use RStudio, open `R/Get_PlanningUnits.R` in the source editor and put the cursor somewhere in the `Get_PlanningUnits()` function definition.
+Now do *Code > Insert roxygen skeleton*.
+A very special comment should appear above your function, in which each line begins with `#'`.
+RStudio only inserts a barebones template, so you will need to edit it.
+
+But we're not done yet!
+We still need to trigger the conversion of this new roxygen comment into `man/Get_PlanningUnits.Rd` with `document()`:
+
+```{r, eval = FALSE}
+devtools::document()
+```
+
+You should now be able to preview your help file like so:
+
+```{r eval = FALSE}
+?Get_PlanningUnits
+```
+
+
+## `check()`
+
+splanning should pass `R CMD check` cleanly now and forever more: 0 errors, 0 warnings, 0 notes.
+
+```{r, eval = FALSE}
+devtools::check()
+```
+
+## `install()`
+
+Since we have a minimum viable product now, let's install the splanning package into your library via `install()`:
+
+```{r, eval = FALSE}
+devtools::install()
+```
+
+Now we can attach and use splanning like any other package.
+
+Let's revisit our small example from the top.
+This is a good time to restart your R session and ensure you have a clean workspace.
+
+```{r, eval = FALSE}
+library(splanning)
+
+CellArea <- 100000
+Region = "South Atlantic Ocean"
+Get_PlanningUnits(Region, CellArea)
+
+library(ggplot2)
+world <- ne_countries(scale = "medium", type = "countries", returnclass = "sf") %>% 
+  filter(continent == "South America" | continent == "Africa")
+
+ggplot() + 
+  geom_sf(data = world, aes(fill = name), show.legend = FALSE) + 
+  geom_sf(data = PUs)
+
+```
+
+Success!
+
+## `use_readme_rmd()`
+
+Now that your package is on GitHub, the `README.md` file matters.
+It is the package's home page and welcome mat, at least until you decide to give it a website (see [pkgdown](https://pkgdown.r-lib.org)), add a vignette (see chapter \@ref(vignettes)), or submit it to CRAN (see chapter \@ref(release)).
+
+The `use_readme_rmd()` function initializes a basic, executable `README.Rmd` ready for you to edit:
+
+```{r use-readme-rmd, eval = FALSE}
+use_readme_rmd()
+```
+
+In addition to creating `README.Rmd`, this adds some lines to `.Rbuildignore`, and creates a Git pre-commit hook to help you keep `README.Rmd` and `README.md` in sync.
+
+`README.Rmd` already has sections that prompt you to:
+
+* Describe the purpose of the package.
+* Provide installation instructions. If a GitHub remote is detected when
+  `use_readme_rmd()` is called, this section is pre-filled with instructions on
+  how to install from GitHub.
+* Show a bit of usage.
+
+How to populate this skeleton?
+Copy stuff liberally from `DESCRIPTION` and any formal and informal tests or examples you have.
+Anything is better than nothing.
+Otherwise ... do you expect people to install your package and comb through individual help files to figure out how to use it?
+They probably won't.
+
+We like to write the `README` in R Markdown, so it can feature actual usage.
+The inclusion of live code also makes it less likely that your `README` grows stale and out-of-sync with your actual package.
+
+If RStudio has not already done so, open `README.Rmd` for editing.
+Make sure it shows some usage of `Get_PlanningUnits()`.
+
+Don't forget to render it to make `README.md`!
+The pre-commit hook should remind you if you try to commit `README.Rmd`, but not `README.md`, and also when `README.md` appears to be out-of-date.
+
+The very best way to render `README.Rmd` is with `build_readme()`, because it takes care to render with the most current version of your package, i.e. it installs a temporary copy from the current source.
+
+```{r readme-render, eval = FALSE}
+devtools::build_readme()
+```
+
+## `use_data`
+
+It makes sense to include data that your package relies on. This could include example datasets (think `mtcars`).
+
+```{r, eval = FALSE}
+Bndry <- rnaturalearth::ne_download(scale = "medium", category = "physical", type = "geography_marine_polys", returnclass = "sf")
+usethis::use_data(Bndry)
+```
+
+## `use_badges`
+
+There are many badges you can use in your markdown and website which indicates the status of your project.
+
+```{r, eval = FALSE}
+use_lifecycle_badge("experimental")
+```
+
+Functions that configure continuous integration, such as `use_github_actions()`, also create badges.
+
+
+## `use_vignette()`
+
+To create your first vignette, run:
+
+```{r, eval = FALSE}
+usethis::use_vignette("my-vignette")
+```
+
+This will:
+
+1.  Create a `vignettes/` directory.
+
+1.  Add the necessary dependencies to `DESCRIPTION` (i.e. it adds knitr to 
+    the `Suggests` and `VignetteBuilder` fields).
+
+1.  Draft a vignette, `vignettes/my-vignette.Rmd`.
+
+The draft vignette has been designed to remind you of the important parts of an R Markdown file. It serves as a useful reference when you're creating a new vignette.
+
+Once you have this file, the workflow is straightforward:
+
+1.  Modify the vignette.
+
+2.  Press Ctrl/Cmd + Shift + K (or click Knit) to knit the 
+    vignette and preview the output.
+
+You can build all vignettes from the console with `devtools::build_vignettes()`, but this is rarely useful. Instead use `devtools::build()` to create a package bundle with the vignettes included. 
+
+There are three important components to an R Markdown vignette:
+
+* The initial metadata block.
+* Markdown for formatting text.
+* Knitr for intermingling text, code and results.
+
+## `pkgdown`
+
+Run once to configure your package to use pkgdown
+
+```{r, eval = FALSE}
+usethis::use_pkgdown()
+```
+
+Then use pkgdown to build your website:
+
+```{r, eval = FALSE}
+pkgdown::build_site()
+```
+
+This generates a docs/ directory containing a website. Your README.md becomes the homepage, documentation in man/ generates a function reference, and vignettes will be rendered into articles/. Read vignette("pkgdown") for more details, and to learn how to deploy your site to GitHub pages.
+
+## Cleanup
+```{r, eval = FALSE}
+pkgload::unload("splanning") # Unload
+remove.packages("splanning") # Delete installed version from your computer
+```
